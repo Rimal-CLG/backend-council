@@ -1,28 +1,63 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DATABASE_AGENT_PROMPT } from './prompts';
-import { DatabaseResponseSchema } from './schemas';
+import { DatabaseResponseSchema, DatabaseResponse } from './schemas';
 import { AiResponseParser, invokeGroq } from '@Common';
+import { AgentContext, AgentResult, AiParseException } from '@Common';
+import { DEFAULT_MODEL } from '@Common';
 
 @Injectable()
 export class DatabaseAgentService {
-  async analyze(input: string) {
+  private readonly logger = new Logger(DatabaseAgentService.name);
+
+  async analyze(context: AgentContext): Promise<AgentResult<DatabaseResponse>> {
+    const startTime = Date.now();
+    const agentName = 'DatabaseAgent';
+    const modelId = process.env.DATABASE_AGENT_MODEL || DEFAULT_MODEL;
+
     const prompt = `
       ${DATABASE_AGENT_PROMPT}
 
       Analyze:
 
-      ${input}
+      ${JSON.stringify(context, null, 2)}
       `;
 
-    const modelId =
-      process.env.DATABASE_AGENT_MODEL || 'llama-3.3-70b-versatile';
-    console.log(
-      `[DatabaseAgent] model=${modelId} promptLength=${prompt.length}`,
-    );
-    const rawText = await invokeGroq(prompt, modelId);
-    console.log('Raw LLM Response:', rawText);
-    // return rawText; // use for testing llm in terminal
+    this.logger.log(`model=${modelId} promptLength=${prompt.length}`);
 
-    return AiResponseParser.parse(rawText, DatabaseResponseSchema);
+    try {
+      const rawText = await invokeGroq(prompt, modelId);
+      this.logger.debug(`Raw LLM response:\n${rawText}`);
+
+      const data = AiResponseParser.parse(rawText, DatabaseResponseSchema);
+
+      return {
+        data,
+        execution: {
+          agentName,
+          durationMs: Date.now() - startTime,
+          success: true,
+          confidence: data.confidence,
+        },
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof AiParseException
+          ? `Parse error: ${error.message}`
+          : error instanceof Error
+            ? error.message
+            : String(error);
+
+      this.logger.error(`${agentName} failed: ${errorMessage}`);
+
+      return {
+        data: null,
+        execution: {
+          agentName,
+          durationMs: Date.now() - startTime,
+          success: false,
+          error: errorMessage,
+        },
+      };
+    }
   }
 }

@@ -1,17 +1,19 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Logger, Post } from '@nestjs/common';
+import { BuildContextDto } from '../../context/dto/build-context.dto';
 import { SecurityAgentService } from './security-agent.service';
 
 @Controller('security-agent')
 export class SecurityAgentController {
+  private readonly logger = new Logger(SecurityAgentController.name);
+
   constructor(private readonly securityAgentService: SecurityAgentService) {}
 
   @Post('analyze')
-  async analyze(@Body() body: { input: string }) {
-    console.log('Security agent is called');
-    console.time('security-agent');
-    const result = await this.securityAgentService.analyze(body.input);
-    console.timeEnd('security-agent');
-    console.log('security agent success');
+  async analyze(@Body() context: BuildContextDto) {
+    this.logger.log('analyze called');
+    const start = Date.now();
+    const result = await this.securityAgentService.analyze(context);
+    this.logger.log(`analyze completed in ${Date.now() - start}ms`);
     return result;
   }
 }

@@ -1,37 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import {
-  DatabaseAgentService,
-  DebugAgentService,
-  JudgeAgentService,
-  SecurityAgentService,
-} from 'src/agents';
-import { CouncilAnalysisDto } from '../council/dto/council-analysis.dto';
-import { ContextService } from 'src/context/context.service';
+import { OrchestratorService } from '../orchestrator/orchestrator.service';
+import { CouncilAnalysisDto } from './dto/council-analysis.dto';
+import { OrchestrationResult } from '../orchestrator/interfaces/orchestration-result.interface';
 
+/**
+ * CouncilService is a thin HTTP-layer adapter.
+ *
+ * Its sole responsibility is to receive the validated DTO from the
+ * CouncilController and delegate the full orchestration workflow to
+ * OrchestratorService. Business logic lives in the orchestrator.
+ */
 @Injectable()
 export class CouncilService {
-  constructor(
-    private readonly databaseAgent: DatabaseAgentService,
-    private readonly securityAgent: SecurityAgentService,
-    private readonly debugAgent: DebugAgentService,
-    private readonly judgeAgent: JudgeAgentService,
-    private readonly contextService: ContextService,
-  ) {}
+  constructor(private readonly orchestratorService: OrchestratorService) {}
 
-  async analyze(request: CouncilAnalysisDto) {
-    const context = this.contextService.buildContext(request);
-
-    const [databaseAnalysis, securityAnalysis, debugAnalysis] =
-      await Promise.all([
-        this.databaseAgent.analyze(JSON.stringify(context)),
-        this.securityAgent.analyze(JSON.stringify(context)),
-        this.debugAgent.analyze(JSON.stringify(context)),
-      ]);
-
-    return this.judgeAgent.synthesize({
-      databaseAnalysis,
-      securityAnalysis,
-      debugAnalysis,
-    });
+  analyze(request: CouncilAnalysisDto): Promise<OrchestrationResult> {
+    return this.orchestratorService.orchestrate(request);
   }
 }

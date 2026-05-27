@@ -1,19 +1,19 @@
-import { Body, Controller, Post } from '@nestjs/common';
-
+import { Body, Controller, Logger, Post } from '@nestjs/common';
 import { JudgeAgentService } from './judge-agent.service';
 import { JudgeInputDto } from './dto';
 
 @Controller('judge-agent')
 export class JudgeAgentController {
+  private readonly logger = new Logger(JudgeAgentController.name);
+
   constructor(private readonly judgeAgentService: JudgeAgentService) {}
 
   @Post('synthesize')
   async synthesize(@Body() body: JudgeInputDto) {
-    console.log('judge agent is called');
-    console.time('judge-agent');
+    this.logger.log('synthesize called');
+    const start = Date.now();
     const result = await this.judgeAgentService.synthesize(body);
-    console.timeEnd('judge-agent');
-    console.log('judge agent success');
+    this.logger.log(`synthesize completed in ${Date.now() - start}ms`);
     return result;
   }
 }
