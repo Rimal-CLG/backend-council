@@ -26,7 +26,7 @@ export class DebugAgentService {
 
     try {
       const rawText = await invokeGroq(prompt, modelId);
-      this.logger.debug(`Raw LLM response:\n${rawText}`);
+      // this.logger.debug(`Raw LLM response:\n${rawText}`);
 
       const data = AiResponseParser.parse(rawText, DebugResponseSchema);
 
