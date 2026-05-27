@@ -1,15 +1,7 @@
-export class CouncilAnalysisDto {
-  framework?: string;
+import { BuildContextDto } from '../../context/dto/build-context.dto';
 
-  database?: string;
-
-  orm?: string;
-
-  error?: string;
-
-  logs?: string;
-
-  stackTrace?: string;
-
-  code?: string;
-}
+/**
+ * CouncilAnalysisDto re-uses all fields from BuildContextDto.
+ * All validation decorators (IsOptional, IsString) are inherited.
+ */
+export class CouncilAnalysisDto extends BuildContextDto {}

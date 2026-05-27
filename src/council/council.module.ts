@@ -1,22 +1,14 @@
 import { Module } from '@nestjs/common';
-import {
-  DebugAgentModule,
-  DatabaseAgentModule,
-  JudgeAgentModule,
-  SecurityAgentModule,
-} from 'src/agents';
+import { OrchestratorModule } from '../orchestrator/orchestrator.module';
 import { CouncilController } from './council.controller';
 import { CouncilService } from './council.service';
-import { ContextModule } from 'src/context/context.module';
 
+/**
+ * CouncilModule handles the public-facing /council HTTP route.
+ * All agent orchestration is owned by OrchestratorModule.
+ */
 @Module({
-  imports: [
-    DatabaseAgentModule,
-    SecurityAgentModule,
-    DebugAgentModule,
-    JudgeAgentModule,
-    ContextModule,
-  ],
+  imports: [OrchestratorModule],
   controllers: [CouncilController],
   providers: [CouncilService],
 })

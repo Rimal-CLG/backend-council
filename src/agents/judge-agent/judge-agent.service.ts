@@ -1,33 +1,69 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { JUDGE_AGENT_PROMPT } from './prompts';
-import { JudgeResponseSchema } from './schemas';
+import { JudgeResponseSchema, JudgeResponse } from './schemas';
+import { JudgeInputDto } from './dto/judge-input.dto';
 import { AiResponseParser, invokeGroq } from '@Common';
+import { AgentResult, AiParseException } from '@Common';
+import { DEFAULT_MODEL } from '@Common';
 
 @Injectable()
 export class JudgeAgentService {
-  async synthesize(data: {
-    databaseAnalysis: unknown;
-    securityAnalysis: unknown;
-    debugAnalysis: unknown;
-  }) {
+  private readonly logger = new Logger(JudgeAgentService.name);
+
+  async synthesize(input: JudgeInputDto): Promise<AgentResult<JudgeResponse>> {
+    const startTime = Date.now();
+    const agentName = 'JudgeAgent';
+    const modelId = process.env.JUDGE_AGENT_MODEL || DEFAULT_MODEL;
+
     const prompt = `
         ${JUDGE_AGENT_PROMPT}
 
         Database Analysis:
-        ${JSON.stringify(data.databaseAnalysis, null, 2)}
+        ${JSON.stringify(input.databaseAnalysis, null, 2)}
 
         Security Analysis:
-        ${JSON.stringify(data.securityAnalysis, null, 2)}
+        ${JSON.stringify(input.securityAnalysis, null, 2)}
 
         Debug Analysis:
-        ${JSON.stringify(data.debugAnalysis, null, 2)}
+        ${JSON.stringify(input.debugAnalysis, null, 2)}
         `;
 
-    const modelId = process.env.JUDGE_AGENT_MODEL || 'llama-3.3-70b-versatile';
-    console.log(`[JudgeAgent] model=${modelId} promptLength=${prompt.length}`);
-    const rawText = await invokeGroq(prompt, modelId);
-    console.log('Raw LLM Response:', rawText);
+    this.logger.log(`model=${modelId} promptLength=${prompt.length}`);
 
-    return AiResponseParser.parse(rawText, JudgeResponseSchema);
+    try {
+      const rawText = await invokeGroq(prompt, modelId);
+      // this.logger.debug(`Raw LLM response:\n${rawText}`);
+
+      const data = AiResponseParser.parse(rawText, JudgeResponseSchema);
+
+      return {
+        data,
+        execution: {
+          agentName,
+          durationMs: Date.now() - startTime,
+          success: true,
+          confidence: data.confidence,
+        },
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof AiParseException
+          ? `Parse error: ${error.message}`
+          : error instanceof Error
+            ? error.message
+            : String(error);
+
+      this.logger.error(`${agentName} failed: ${errorMessage}`);
+
+      return {
+        data: null,
+        execution: {
+          agentName,
+          durationMs: Date.now() - startTime,
+          success: false,
+          error: errorMessage,
+        },
+      };
+    }
   }
 }

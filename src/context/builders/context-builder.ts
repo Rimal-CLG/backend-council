@@ -10,9 +10,6 @@ export class ContextBuilder {
       logs: payload.logs,
       stackTrace: payload.stackTrace,
       code: payload.code,
-      metadata: {
-        generatedAt: new Date(),
-      },
     };
   }
 }

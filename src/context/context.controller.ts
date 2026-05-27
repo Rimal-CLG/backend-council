@@ -13,6 +13,6 @@ export class ContextController {
     @Body()
     dto: BuildContextDto,
   ) {
-    return this.contextService.buildContext(dto);
+    return this.contextService.buildContextResponse(dto);
   }
 }
