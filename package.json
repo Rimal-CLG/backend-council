@@ -76,8 +76,7 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
-      "^@Common$": "<rootDir>/common/index",
-      "^@Config$": "<rootDir>/configs/index"
+      "^@Common$": "<rootDir>/common/index"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
