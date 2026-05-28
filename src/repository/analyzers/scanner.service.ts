@@ -111,7 +111,18 @@ export class ScannerService {
     const files = fs.readdirSync(dirPath);
 
     files.forEach((file) => {
-      const fullPath = safePath(dirPath, file);
+      // Fix L-2: Wrap safePath in try-catch so a single unexpected filename
+      // does not abort the entire recursive scan. Log a warning and continue.
+      let fullPath: string;
+      try {
+        fullPath = safePath(dirPath, file);
+      } catch {
+        this.logger.warn(
+          `Skipping entry with invalid path during scan: ${sanitizeForLog(file)}`,
+        );
+        return;
+      }
+
       // Skip node_modules and .git to save massive amounts of time/memory
       if (file === 'node_modules' || file === '.git') return;
 
@@ -125,3 +136,4 @@ export class ScannerService {
     return arrayOfFiles;
   }
 }
+

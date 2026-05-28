@@ -22,6 +22,7 @@ import { JudgePatchEvalResponse } from '../agents/judge-agent/schemas';
 import { OrchestratorRequestDto } from './dto/orchestrator-request.dto';
 import { OrchestrationResult } from './interfaces/orchestration-result.interface';
 import { AgentExecution } from '../common/interfaces/agent-execution.interface';
+import { ObservabilityService } from '../observability/observability.service';
 
 /**
  * OrchestratorService is the single source of truth for the full
@@ -50,6 +51,7 @@ export class OrchestratorService {
     private readonly verificationService: VerificationService,
     private readonly patchService: PatchService,
     private readonly sandboxService: SandboxService,
+    private readonly observabilityService: ObservabilityService,
   ) {}
 
   async orchestrate(
@@ -63,6 +65,11 @@ export class OrchestratorService {
     const orchestrationStart = Date.now();
 
     this.logger.log(`[${sanitizeForLog(executionId)}] Orchestration started`);
+
+    await this.observabilityService.recordAnalysisStart({
+      executionId,
+      repositoryId: request.repositoryId,
+    });
 
     // Build clean AgentContext — no JSON stringification at this layer
     const baseContext = await this.contextService.buildContext(request);
@@ -135,6 +142,15 @@ export class OrchestratorService {
         );
 
         if (verifiedPatch) {
+          // Record verification success/failure
+          await this.observabilityService.recordVerificationExecution({
+            executionId,
+            buildPassed: verifiedPatch.buildPassed,
+            lintPassed: verifiedPatch.lintPassed,
+            testsPassed: verifiedPatch.testsPassed,
+            durationMs: verifiedPatch.executionTimeMs,
+          });
+
           const evalResult = await this.judgeAgent.evaluatePatch({
             originalAnalysis: judgeResult.data,
             patch,
@@ -152,6 +168,24 @@ export class OrchestratorService {
     this.logger.log(
       `[${sanitizeForLog(executionId)}] Orchestration complete in ${totalDurationMs}ms`,
     );
+
+    await this.observabilityService.recordAnalysisComplete({
+      executionId,
+      totalDurationMs,
+      finalConfidence: judgeResult.data?.confidence,
+      finalRecommendation: judgeResult.data?.finalRootCause,
+    });
+
+    // Record all agent executions to DB at the end to include evaluatePatch
+    for (const agent of agentExecutions) {
+      await this.observabilityService.recordAgentExecution({
+        executionId,
+        agentName: agent.agentName,
+        durationMs: agent.durationMs,
+        confidence: agent.confidence,
+        success: agent.success,
+      });
+    }
 
     return {
       executionId,

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsArray } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsUUID } from 'class-validator';
 
 export class BuildContextDto {
   @IsOptional()
@@ -34,7 +34,8 @@ export class BuildContextDto {
   @IsString({ each: true })
   fileIds?: string[];
 
+  // Fix M-3: Validate as UUID at the DTO boundary — not just downstream in service logic
   @IsOptional()
-  @IsString()
+  @IsUUID('4')
   repositoryId?: string;
 }
