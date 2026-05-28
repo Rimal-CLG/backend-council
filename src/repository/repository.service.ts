@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
-import { sanitizeForLog, safePath, isValidFileId } from '@Common';
+import { sanitizeForLog, isValidFileId } from '@Common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import AdmZip = require('adm-zip');
 
@@ -91,13 +91,23 @@ export class RepositoryService {
 
   private async cleanupFile(filename: string): Promise<void> {
     try {
-      if (!isValidFileId(filename)) {
+      const normalizedFilename = path.basename(filename);
+      if (normalizedFilename !== filename || !isValidFileId(normalizedFilename)) {
         this.logger.warn(
           `Skipped cleanup for invalid filename: ${sanitizeForLog(filename)}`,
         );
         return;
       }
-      const safeFilePath = safePath(this.tempDir, filename);
+
+      const resolvedBase = path.resolve(this.tempDir) + path.sep;
+      const safeFilePath = path.resolve(this.tempDir, normalizedFilename);
+      if (!safeFilePath.startsWith(resolvedBase)) {
+        this.logger.warn(
+          `Skipped cleanup for out-of-bounds filename: ${sanitizeForLog(filename)}`,
+        );
+        return;
+      }
+
       if (fs.existsSync(safeFilePath)) {
         await fs.promises.unlink(safeFilePath);
       }
