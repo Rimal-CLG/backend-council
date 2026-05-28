@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
-import { safePath } from '@Common';
+import { isValidFileId, safePath } from '@Common';
 import { UploadResponseDto } from './dto';
 
 @Injectable()
@@ -45,6 +45,11 @@ export class UploadsService {
 
   private async cleanupFile(filename: string): Promise<void> {
     try {
+      if (!isValidFileId(filename)) {
+        this.logger.warn('Skipped cleanup for invalid upload file identifier');
+        return;
+      }
+
       const safeFilePath = safePath(this.tempDir, filename);
       await fs.promises.unlink(safeFilePath);
     } catch (err) {
