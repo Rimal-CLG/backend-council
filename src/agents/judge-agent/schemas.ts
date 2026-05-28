@@ -1,4 +1,4 @@
-﻿import { BaseAgentSchema } from '@Common';
+import { BaseAgentSchema } from '@Common';
 import { z } from 'zod';
 
 export const JudgeResponseSchema = BaseAgentSchema.extend({
@@ -16,3 +16,13 @@ export const JudgeResponseSchema = BaseAgentSchema.extend({
 });
 
 export type JudgeResponse = z.infer<typeof JudgeResponseSchema>;
+
+export const JudgePatchEvalResponseSchema = BaseAgentSchema.extend({
+  explanation: z.string(),
+  passReason: z.string().nullish(),
+  failReason: z.string().nullish(),
+});
+
+export type JudgePatchEvalResponse = z.infer<
+  typeof JudgePatchEvalResponseSchema
+>;

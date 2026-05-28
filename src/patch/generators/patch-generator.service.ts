@@ -27,7 +27,7 @@ export class PatchGeneratorService {
       throw new BadRequestException('Invalid repository identifier');
     }
 
-    const repositoryPath = path.join(this.REPO_BASE, repositoryId);
+    const repositoryPath = safePath(this.REPO_BASE, repositoryId);
 
     // Extract unique files that the judge recommended to fix
     const targetFiles = Array.from(

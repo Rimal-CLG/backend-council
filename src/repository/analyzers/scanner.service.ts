@@ -10,7 +10,7 @@ import {
   ArchitectureSummaryService,
   ArchitectureSummary,
 } from './architecture-summary.service';
-import { isValidUUID, sanitizeForLog } from '@Common';
+import { isValidUUID, sanitizeForLog, safePath } from '@Common';
 
 export interface ScannedFile {
   filename: string;
@@ -37,7 +37,7 @@ export class ScannerService {
       throw new BadRequestException('Invalid repository identifier');
     }
 
-    const extractPath = path.join(this.REPO_BASE, repositoryId);
+    const extractPath = safePath(this.REPO_BASE, repositoryId);
 
     if (!fs.existsSync(extractPath)) {
       throw new NotFoundException('Repository not found');
@@ -111,7 +111,7 @@ export class ScannerService {
     const files = fs.readdirSync(dirPath);
 
     files.forEach((file) => {
-      const fullPath = path.join(dirPath, file);
+      const fullPath = safePath(dirPath, file);
       // Skip node_modules and .git to save massive amounts of time/memory
       if (file === 'node_modules' || file === '.git') return;
 

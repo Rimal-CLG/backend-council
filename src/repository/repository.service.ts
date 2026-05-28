@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
-import { sanitizeForLog } from '@Common';
+import { sanitizeForLog, isValidFileId } from '@Common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import AdmZip = require('adm-zip');
 
@@ -25,7 +25,7 @@ export class RepositoryService {
       file.mimetype !== 'application/x-zip-compressed' &&
       !file.originalname.endsWith('.zip')
     ) {
-      await this.cleanupFile(file.path);
+      await this.cleanupFile(file.filename);
       throw new BadRequestException('Only ZIP files are supported');
     }
 
@@ -42,7 +42,7 @@ export class RepositoryService {
         `Failed to extract repository ${sanitizeForLog(repositoryId)}`,
         err instanceof Error ? err.stack : undefined,
       );
-      await this.cleanupFile(file.path);
+      await this.cleanupFile(file.filename);
       // Clean up partial extraction if failed
       if (fs.existsSync(extractPath)) {
         fs.rmSync(extractPath, { recursive: true, force: true });
@@ -52,7 +52,7 @@ export class RepositoryService {
     }
 
     // Cleanup the uploaded zip file after extraction
-    await this.cleanupFile(file.path);
+    await this.cleanupFile(file.filename);
 
     return { repositoryId };
   }
@@ -89,10 +89,27 @@ export class RepositoryService {
     }
   }
 
-  private async cleanupFile(filePath: string): Promise<void> {
+  private async cleanupFile(filename: string): Promise<void> {
     try {
-      if (fs.existsSync(filePath)) {
-        await fs.promises.unlink(filePath);
+      const normalizedFilename = path.basename(filename);
+      if (normalizedFilename !== filename || !isValidFileId(normalizedFilename)) {
+        this.logger.warn(
+          `Skipped cleanup for invalid filename: ${sanitizeForLog(filename)}`,
+        );
+        return;
+      }
+
+      const resolvedBase = path.resolve(this.tempDir) + path.sep;
+      const safeFilePath = path.resolve(this.tempDir, normalizedFilename);
+      if (!safeFilePath.startsWith(resolvedBase)) {
+        this.logger.warn(
+          `Skipped cleanup for out-of-bounds filename: ${sanitizeForLog(filename)}`,
+        );
+        return;
+      }
+
+      if (fs.existsSync(safeFilePath)) {
+        await fs.promises.unlink(safeFilePath);
       }
     } catch (err) {
       // Sanitize log output (CodeQL: js/log-injection)

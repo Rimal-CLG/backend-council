@@ -1,9 +1,13 @@
 import { DatabaseResponse } from '../../agents/database-agent/schemas';
 import { SecurityResponse } from '../../agents/security-agent/schemas';
 import { DebugResponse } from '../../agents/debug-agent/schemas';
-import { JudgeResponse } from '../../agents/judge-agent/schemas';
+import {
+  JudgeResponse,
+  JudgePatchEvalResponse,
+} from '../../agents/judge-agent/schemas';
 import { AgentExecution } from '../../common/interfaces/agent-execution.interface';
 import { PatchResult } from '../../patch/interfaces/patch-result.interface';
+import { VerifiedPatchResult } from '../../sandbox/interfaces/verified-patch-result.interface';
 
 /**
  * The fully typed result returned by OrchestratorService.orchestrate().
@@ -27,6 +31,12 @@ export interface OrchestrationResult {
 
   /** Generated code patch if requested and available. */
   patch?: PatchResult | null;
+
+  /** Result of running the patch through the sandbox verification pipeline. */
+  verifiedPatch?: VerifiedPatchResult | null;
+
+  /** Judge's evaluation of the sandbox verification result. */
+  patchEvaluation?: JudgePatchEvalResponse | null;
 
   /** Aggregate execution statistics for this orchestration run. */
   metadata: {

@@ -1,7 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { JUDGE_AGENT_PROMPT } from './prompts';
-import { JudgeResponseSchema, JudgeResponse } from './schemas';
+import { JUDGE_AGENT_PROMPT, JUDGE_PATCH_EVAL_PROMPT } from './prompts';
+import {
+  JudgeResponseSchema,
+  JudgeResponse,
+  JudgePatchEvalResponseSchema,
+  JudgePatchEvalResponse,
+} from './schemas';
 import { JudgeInputDto } from './dto/judge-input.dto';
+import { JudgePatchEvalInputDto } from './dto/judge-patch-eval-input.dto';
 import {
   AiResponseParser,
   invokeGroq,
@@ -56,6 +62,68 @@ export class JudgeAgentService {
         // Clamp between 0.0 and 1.0
         data.confidence = Math.max(0, Math.min(1, data.confidence));
       }
+
+      return {
+        data,
+        execution: {
+          agentName,
+          durationMs: Date.now() - startTime,
+          success: true,
+          confidence: data.confidence,
+        },
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof AiParseException
+          ? `Parse error: ${error.message}`
+          : error instanceof Error
+            ? error.message
+            : String(error);
+
+      this.logger.error(`${agentName} failed: ${sanitizeForLog(errorMessage)}`);
+
+      return {
+        data: null,
+        execution: {
+          agentName,
+          durationMs: Date.now() - startTime,
+          success: false,
+          error: errorMessage,
+        },
+      };
+    }
+  }
+
+  async evaluatePatch(
+    input: JudgePatchEvalInputDto,
+  ): Promise<AgentResult<JudgePatchEvalResponse>> {
+    const startTime = Date.now();
+    const agentName = 'JudgeAgent(PatchEval)';
+    const modelId = process.env.JUDGE_AGENT_MODEL || DEFAULT_MODEL;
+
+    const prompt = `
+      ${JUDGE_PATCH_EVAL_PROMPT}
+
+      Original Judge Analysis:
+      ${JSON.stringify(input.originalAnalysis, null, 2)}
+
+      Generated Patch:
+      ${JSON.stringify(input.patch, null, 2)}
+
+      Sandbox Verification Result:
+      ${JSON.stringify(input.verificationResult, null, 2)}
+    `;
+
+    this.logger.log(
+      `model=${sanitizeForLog(modelId)} promptLength=${prompt.length}`,
+    );
+
+    try {
+      const rawText = await invokeGroq(prompt, modelId);
+      const data = AiResponseParser.parse(
+        rawText,
+        JudgePatchEvalResponseSchema,
+      );
 
       return {
         data,

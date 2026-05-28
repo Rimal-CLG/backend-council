@@ -15,7 +15,7 @@ export class PatchValidatorService {
       throw new BadRequestException('Invalid repository identifier');
     }
 
-    const repositoryPath = path.join(this.REPO_BASE, patch.repositoryId);
+    const repositoryPath = safePath(this.REPO_BASE, patch.repositoryId);
 
     if (!fs.existsSync(repositoryPath)) {
       // Don't echo repositoryId back (CodeQL: js/information-exposure)
