@@ -3,6 +3,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
+import { randomBytes } from 'crypto';
 import { RepositoryController } from './repository.controller';
 import { RepositoryService } from './repository.service';
 import { ScannerService } from './analyzers/scanner.service';
@@ -22,8 +23,8 @@ if (!fs.existsSync(storagePath)) {
       storage: diskStorage({
         destination: storagePath,
         filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          // Fix M-4: Use cryptographically secure random bytes instead of Math.random()
+          const uniqueSuffix = randomBytes(16).toString('hex');
           const ext = path.extname(file.originalname);
           cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
         },

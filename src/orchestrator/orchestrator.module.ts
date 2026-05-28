@@ -9,6 +9,7 @@ import { ContextModule } from '../context/context.module';
 import { VerificationModule } from '../verification/verification.module';
 import { PatchModule } from '../patch/patch.module';
 import { SandboxModule } from '../sandbox/sandbox.module';
+import { ObservabilityModule } from '../observability/observability.module';
 import { OrchestratorService } from './orchestrator.service';
 import { OrchestratorController } from './orchestrator.controller';
 
@@ -30,6 +31,7 @@ import { OrchestratorController } from './orchestrator.controller';
     VerificationModule,
     PatchModule,
     SandboxModule,
+    ObservabilityModule,
   ],
   controllers: [OrchestratorController],
   providers: [OrchestratorService],

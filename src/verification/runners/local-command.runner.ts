@@ -56,10 +56,12 @@ export class LocalCommandRunner {
     );
 
     try {
+      // Fix H-1: No shell:true — execFile with explicit args array is sufficient
+      // and prevents shell injection. npm resolves via PATH without shell.
       const { stdout, stderr } = await execFileAsync(
         allowed.file,
         allowed.args,
-        { cwd, shell: true },
+        { cwd },
       );
       return { stdout, stderr, exitCode: 0 };
     } catch (error: unknown) {

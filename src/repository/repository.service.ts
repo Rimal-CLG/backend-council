@@ -92,7 +92,10 @@ export class RepositoryService {
   private async cleanupFile(filename: string): Promise<void> {
     try {
       const normalizedFilename = path.basename(filename);
-      if (normalizedFilename !== filename || !isValidFileId(normalizedFilename)) {
+      if (
+        normalizedFilename !== filename ||
+        !isValidFileId(normalizedFilename)
+      ) {
         this.logger.warn(
           `Skipped cleanup for invalid filename: ${sanitizeForLog(filename)}`,
         );

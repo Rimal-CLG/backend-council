@@ -6,3 +6,40 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model AnalysisExecution {
+  id                  String   @id @default(uuid())
+  executionId         String   @unique
+  repositoryId        String?
+  createdAt           DateTime @default(now())
+  totalDurationMs     Int
+  finalConfidence     Float?
+  finalRecommendation String?  @db.Text
+
+  agents       AgentExecution[]
+  verification VerificationExecution?
+}
+
+model AgentExecution {
+  id             String            @id @default(uuid())
+  analysisId     String
+  analysis       AnalysisExecution @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  agentName      String
+  durationMs     Int
+  confidence     Float?
+  tokensUsed     Int?
+  success        Boolean
+  accepted       Boolean?          // Did the Judge accept this agent's finding?
+
+  @@index([analysisId])
+}
+
+model VerificationExecution {
+  id             String            @id @default(uuid())
+  analysisId     String            @unique
+  analysis       AnalysisExecution @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  buildPassed    Boolean
+  lintPassed     Boolean
+  testsPassed    Boolean
+  durationMs     Int
+}
