@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
-import { sanitizeForLog, safePath } from '@Common';
+import { sanitizeForLog, safePath, isValidFileId } from '@Common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import AdmZip = require('adm-zip');
 
@@ -25,7 +25,7 @@ export class RepositoryService {
       file.mimetype !== 'application/x-zip-compressed' &&
       !file.originalname.endsWith('.zip')
     ) {
-      await this.cleanupFile(file.path);
+      await this.cleanupFile(file.filename);
       throw new BadRequestException('Only ZIP files are supported');
     }
 
@@ -91,6 +91,12 @@ export class RepositoryService {
 
   private async cleanupFile(filename: string): Promise<void> {
     try {
+      if (!isValidFileId(filename)) {
+        this.logger.warn(
+          `Skipped cleanup for invalid filename: ${sanitizeForLog(filename)}`,
+        );
+        return;
+      }
       const safeFilePath = safePath(this.tempDir, filename);
       if (fs.existsSync(safeFilePath)) {
         await fs.promises.unlink(safeFilePath);
