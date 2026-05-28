@@ -60,5 +60,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 storage/
 
 temp/
-src.zip
-dist.zip
+*.zip
+*.rar
