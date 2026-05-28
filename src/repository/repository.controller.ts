@@ -6,6 +6,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RepositoryService } from './repository.service';
@@ -30,7 +31,11 @@ export class RepositoryController {
   }
 
   @Get('context-preview/:repositoryId')
-  async previewContext(@Param('repositoryId') repositoryId: string) {
+  async previewContext(
+    // ParseUUIDPipe validates format before reaching service logic
+    // (CodeQL: js/missing-rate-limiting, js/path-injection)
+    @Param('repositoryId', new ParseUUIDPipe()) repositoryId: string,
+  ) {
     // Build the base context from the repository
     const baseContext = await this.contextService.buildContext({
       repositoryId,
@@ -42,11 +47,12 @@ export class RepositoryController {
 
     // To prevent giant payload, strip out the actual file content, leaving just the metadata
 
-    const stripContent = (files: any[]): any[] =>
-      files?.map((f: any) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-assignment
+    const stripContent = (
+      files: Array<{ content?: string; [key: string]: unknown }>,
+    ): Array<Record<string, unknown>> =>
+      files?.map((f) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { content, ...rest } = f;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return rest;
       }) || [];
 

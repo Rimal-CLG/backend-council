@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+import { sanitizeForLog } from '@Common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import AdmZip = require('adm-zip');
 
@@ -28,6 +29,7 @@ export class RepositoryService {
       throw new BadRequestException('Only ZIP files are supported');
     }
 
+    // repositoryId is server-generated and guaranteed to be a UUID
     const repositoryId = crypto.randomUUID();
     const extractPath = path.join(this.tempDir, repositoryId);
 
@@ -35,12 +37,17 @@ export class RepositoryService {
       fs.mkdirSync(extractPath, { recursive: true });
       this.extractZipSafely(file.path, extractPath);
     } catch (err) {
-      this.logger.error(`Failed to extract repository ${repositoryId}`, err);
+      // Sanitize log output (CodeQL: js/log-injection)
+      this.logger.error(
+        `Failed to extract repository ${sanitizeForLog(repositoryId)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       await this.cleanupFile(file.path);
       // Clean up partial extraction if failed
       if (fs.existsSync(extractPath)) {
         fs.rmSync(extractPath, { recursive: true, force: true });
       }
+      // Don't leak internal details (CodeQL: js/information-exposure)
       throw new BadRequestException('Invalid or corrupted ZIP file');
     }
 
@@ -54,16 +61,20 @@ export class RepositoryService {
     const zip = new AdmZip(zipFilePath);
     const zipEntries = zip.getEntries();
 
+    // Resolve the target directory once, with trailing separator for reliable prefix check
+    // (CodeQL: js/incomplete-url-substring-sanitization, js/path-injection)
+    const resolvedTarget = path.resolve(targetDir) + path.sep;
+
     for (const entry of zipEntries) {
       if (entry.isDirectory) {
         continue;
       }
 
-      // ZIP slip protection: ensure resolved path starts with targetDir
+      // ZIP slip protection: ensure resolved path starts with targetDir + separator
       const entryName = entry.entryName;
       const resolvedPath = path.resolve(targetDir, entryName);
 
-      if (!resolvedPath.startsWith(path.resolve(targetDir))) {
+      if (!resolvedPath.startsWith(resolvedTarget)) {
         throw new Error('Invalid ZIP entry: path traversal detected');
       }
 
@@ -84,7 +95,10 @@ export class RepositoryService {
         await fs.promises.unlink(filePath);
       }
     } catch (err) {
-      this.logger.warn(`Failed to cleanup file ${filePath}: ${err}`);
+      // Sanitize log output (CodeQL: js/log-injection)
+      this.logger.warn(
+        `Failed to cleanup file: ${err instanceof Error ? err.message : 'unknown error'}`,
+      );
     }
   }
 }

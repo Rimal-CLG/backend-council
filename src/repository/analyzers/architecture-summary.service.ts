@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ScannedFile } from './scanner.service';
 import * as crypto from 'crypto';
+import { filterDangerousKeys } from '@Common';
 
 export interface ArchitectureSummary {
   framework?: string;
@@ -37,7 +38,11 @@ export class ArchitectureSummaryService {
           devDependencies?: Record<string, string>;
           name?: string;
         };
-        const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+        // Filter out __proto__, constructor, prototype keys to prevent
+        // prototype pollution from malicious package.json (CodeQL: js/prototype-pollution)
+        const safeDeps = filterDangerousKeys(pkg.dependencies ?? {});
+        const safeDevDeps = filterDangerousKeys(pkg.devDependencies ?? {});
+        const deps = { ...safeDeps, ...safeDevDeps };
 
         summary.dependencyGraph = Object.keys(deps);
 

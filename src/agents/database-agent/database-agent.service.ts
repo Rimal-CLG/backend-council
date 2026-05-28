@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DATABASE_AGENT_PROMPT } from './prompts';
 import { DatabaseResponseSchema, DatabaseResponse } from './schemas';
-import { AiResponseParser, invokeGroq } from '@Common';
+import { AiResponseParser, invokeGroq, sanitizeForLog } from '@Common';
 import {
   AgentContext,
   AgentResult,
@@ -36,7 +36,9 @@ export class DatabaseAgentService {
       ${filesContext}
       `;
 
-    this.logger.log(`model=${modelId} promptLength=${prompt.length}`);
+    this.logger.log(
+      `model=${sanitizeForLog(modelId)} promptLength=${prompt.length}`,
+    );
 
     try {
       const rawText = await invokeGroq(prompt, modelId);
@@ -61,7 +63,7 @@ export class DatabaseAgentService {
             ? error.message
             : String(error);
 
-      this.logger.error(`${agentName} failed: ${errorMessage}`);
+      this.logger.error(`${agentName} failed: ${sanitizeForLog(errorMessage)}`);
 
       return {
         data: null,

@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
 import { PatchResult } from '../interfaces/patch-result.interface';
+import { sanitizeForLog, isValidUUID, safePath } from '@Common';
 
 @Injectable()
 export class PatchValidatorService {
@@ -9,27 +10,33 @@ export class PatchValidatorService {
   private readonly REPO_BASE = path.join(process.cwd(), 'temp', 'repositories');
 
   validatePatch(patch: PatchResult): void {
+    // Validate repositoryId to prevent path traversal (CodeQL: js/path-injection)
+    if (!isValidUUID(patch.repositoryId)) {
+      throw new BadRequestException('Invalid repository identifier');
+    }
+
     const repositoryPath = path.join(this.REPO_BASE, patch.repositoryId);
 
     if (!fs.existsSync(repositoryPath)) {
-      throw new BadRequestException(
-        `Repository ${patch.repositoryId} not found`,
-      );
+      // Don't echo repositoryId back (CodeQL: js/information-exposure)
+      throw new BadRequestException('Repository not found');
     }
 
     for (const filePatch of patch.files) {
-      // Prevent directory traversal attacks
-      if (filePatch.path.includes('..') || path.isAbsolute(filePatch.path)) {
-        throw new BadRequestException(`Invalid file path: ${filePatch.path}`);
+      // Use safePath for robust traversal protection instead of naive '..' check
+      // (CodeQL: js/path-injection, js/incomplete-url-substring-sanitization)
+      let absolutePath: string;
+      try {
+        absolutePath = safePath(repositoryPath, filePatch.path);
+      } catch {
+        // Don't echo the malicious path back (CodeQL: js/information-exposure)
+        throw new BadRequestException('Invalid file path in patch');
       }
 
-      const absolutePath = path.join(repositoryPath, filePatch.path);
       const exists = fs.existsSync(absolutePath);
 
       if (filePatch.action === 'CREATE' && exists) {
-        throw new BadRequestException(
-          `Cannot CREATE existing file: ${filePatch.path}`,
-        );
+        throw new BadRequestException('Cannot CREATE an already existing file');
       }
 
       if (
@@ -37,13 +44,14 @@ export class PatchValidatorService {
         !exists
       ) {
         throw new BadRequestException(
-          `Cannot ${filePatch.action} non-existent file: ${filePatch.path}`,
+          `Cannot ${filePatch.action} a non-existent file`,
         );
       }
     }
 
+    // Sanitize log output (CodeQL: js/log-injection)
     this.logger.log(
-      `Patch validation successful for repository ${patch.repositoryId}`,
+      `Patch validation successful for repository ${sanitizeForLog(patch.repositoryId)}`,
     );
   }
 }

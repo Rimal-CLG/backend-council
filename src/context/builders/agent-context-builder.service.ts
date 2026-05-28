@@ -43,8 +43,10 @@ export class AgentContextBuilderService {
     context: AgentContext,
     keywords: string[],
   ): AgentContext {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const cloned: AgentContext = JSON.parse(JSON.stringify(context));
+    // Use structuredClone instead of JSON.parse(JSON.stringify()) to prevent
+    // prototype pollution — structuredClone strips __proto__ keys automatically.
+    // (CodeQL: js/prototype-pollution)
+    const cloned: AgentContext = structuredClone(context);
 
     let filesSelected = 0;
     let filesRejected = 0;

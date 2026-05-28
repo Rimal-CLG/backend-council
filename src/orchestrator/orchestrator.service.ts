@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { sanitizeForLog } from '@Common';
 import { DatabaseAgentService } from '../agents/database-agent/database-agent.service';
 import { SecurityAgentService } from '../agents/security-agent/security-agent.service';
 import { DebugAgentService } from '../agents/debug-agent/debug-agent.service';
@@ -52,7 +53,7 @@ export class OrchestratorService {
     const executionId = randomUUID();
     const orchestrationStart = Date.now();
 
-    this.logger.log(`[${executionId}] Orchestration started`);
+    this.logger.log(`[${sanitizeForLog(executionId)}] Orchestration started`);
 
     // Build clean AgentContext — no JSON stringification at this layer
     const baseContext = await this.contextService.buildContext(request);
@@ -83,7 +84,7 @@ export class OrchestratorService {
     const failedAgents = agentExecutions.filter((e) => !e.success).length;
 
     this.logger.log(
-      `[${executionId}] Specialist agents complete — success=${successfulAgents} failed=${failedAgents}`,
+      `[${sanitizeForLog(executionId)}] Specialist agents complete — success=${successfulAgents} failed=${failedAgents}`,
     );
 
     if (successfulAgents === 0) {
@@ -118,7 +119,7 @@ export class OrchestratorService {
 
     const totalDurationMs = Date.now() - orchestrationStart;
     this.logger.log(
-      `[${executionId}] Orchestration complete in ${totalDurationMs}ms`,
+      `[${sanitizeForLog(executionId)}] Orchestration complete in ${totalDurationMs}ms`,
     );
 
     return {

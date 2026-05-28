@@ -5,6 +5,7 @@ import { Context } from './interfaces/context.interface';
 import { FileParserService } from './parsers';
 import { ScannerService } from '../repository/analyzers/scanner.service';
 import { RankingService } from '../repository/extractors/ranking.service';
+import { sanitizeForLog } from '@Common';
 
 @Injectable()
 export class ContextService {
@@ -35,8 +36,8 @@ export class ContextService {
           });
         } catch (error) {
           this.logger.warn(
-            `Could not parse file ${fileId} during context enrichment`,
-            error,
+            `Could not parse file ${sanitizeForLog(fileId)} during context enrichment`,
+            error instanceof Error ? error.stack : undefined,
           );
         }
       }
@@ -87,8 +88,8 @@ export class ContextService {
         context.files.push(...topFiles);
       } catch (error) {
         this.logger.error(
-          `Error processing repository ${dto.repositoryId}`,
-          error,
+          `Error processing repository ${sanitizeForLog(dto.repositoryId ?? '')}`,
+          error instanceof Error ? error.stack : undefined,
         );
       }
     }

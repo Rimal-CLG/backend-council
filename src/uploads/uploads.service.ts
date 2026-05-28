@@ -28,9 +28,8 @@ export class UploadsService {
     if (!this.allowedExtensions.includes(extension)) {
       // Remove the rejected file from disk
       await this.cleanupFile(file.path);
-      throw new UnsupportedMediaTypeException(
-        `Unsupported file extension: ${extension}`,
-      );
+      // Don't echo raw extension back (CodeQL: js/information-exposure)
+      throw new UnsupportedMediaTypeException('Unsupported file type');
     }
 
     return {
@@ -46,7 +45,10 @@ export class UploadsService {
     try {
       await fs.promises.unlink(filePath);
     } catch (err) {
-      this.logger.warn(`Failed to cleanup file ${filePath}: ${err}`);
+      // Don't log raw file paths (CodeQL: js/log-injection)
+      this.logger.warn(
+        `Failed to cleanup uploaded file: ${err instanceof Error ? err.message : 'unknown error'}`,
+      );
     }
   }
 }

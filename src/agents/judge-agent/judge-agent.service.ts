@@ -8,6 +8,7 @@ import {
   AgentResult,
   AiParseException,
   DEFAULT_MODEL,
+  sanitizeForLog,
 } from '@Common';
 
 @Injectable()
@@ -39,7 +40,9 @@ export class JudgeAgentService {
       `;
     }
 
-    this.logger.log(`model=${modelId} promptLength=${prompt.length}`);
+    this.logger.log(
+      `model=${sanitizeForLog(modelId)} promptLength=${prompt.length}`,
+    );
 
     try {
       const rawText = await invokeGroq(prompt, modelId);
@@ -71,7 +74,7 @@ export class JudgeAgentService {
             ? error.message
             : String(error);
 
-      this.logger.error(`${agentName} failed: ${errorMessage}`);
+      this.logger.error(`${agentName} failed: ${sanitizeForLog(errorMessage)}`);
 
       return {
         data: null,

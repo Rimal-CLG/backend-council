@@ -1,10 +1,16 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
 import {
   ArchitectureSummaryService,
   ArchitectureSummary,
 } from './architecture-summary.service';
+import { isValidUUID, sanitizeForLog } from '@Common';
 
 export interface ScannedFile {
   filename: string;
@@ -17,6 +23,7 @@ export interface ScannedFile {
 @Injectable()
 export class ScannerService {
   private readonly logger = new Logger(ScannerService.name);
+  private readonly REPO_BASE = path.join(process.cwd(), 'temp', 'repositories');
 
   constructor(
     private readonly architectureSummaryService: ArchitectureSummaryService,
@@ -25,14 +32,15 @@ export class ScannerService {
   public async scanRepository(
     repositoryId: string,
   ): Promise<{ metadata: ArchitectureSummary; files: ScannedFile[] }> {
-    const extractPath = path.join(
-      process.cwd(),
-      'temp',
-      'repositories',
-      repositoryId,
-    );
+    // Validate repositoryId format to prevent path traversal (CodeQL: js/path-injection)
+    if (!isValidUUID(repositoryId)) {
+      throw new BadRequestException('Invalid repository identifier');
+    }
+
+    const extractPath = path.join(this.REPO_BASE, repositoryId);
+
     if (!fs.existsSync(extractPath)) {
-      throw new NotFoundException(`Repository ${repositoryId} not found`);
+      throw new NotFoundException('Repository not found');
     }
 
     const allFiles = this.getAllFiles(extractPath);
@@ -85,7 +93,11 @@ export class ScannerService {
           size: stat.size,
         });
       } catch (err) {
-        this.logger.warn(`Skipping unreadable file ${filePath}`, err);
+        // Sanitize filePath in logs to prevent log injection (CodeQL: js/log-injection)
+        this.logger.warn(
+          `Skipping unreadable file ${sanitizeForLog(filePath)}`,
+          err instanceof Error ? err.stack : undefined,
+        );
       }
     }
 

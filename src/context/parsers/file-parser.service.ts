@@ -1,6 +1,12 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import { isValidFileId, sanitizeForLog, safePath } from '@Common';
 
 export interface ParsedFile {
   filename: string;
@@ -13,12 +19,20 @@ export interface ParsedFile {
 @Injectable()
 export class FileParserService {
   private readonly logger = new Logger(FileParserService.name);
+  private readonly UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 
   async parseFile(fileId: string): Promise<ParsedFile> {
-    const uploadPath = path.join(process.cwd(), 'uploads', fileId);
+    // Validate fileId format to prevent path traversal (CodeQL: js/path-injection)
+    if (!isValidFileId(fileId)) {
+      throw new BadRequestException('Invalid file identifier');
+    }
+
+    // Use safePath to guarantee no directory escape (CodeQL: js/path-injection)
+    const uploadPath = safePath(this.UPLOAD_DIR, fileId);
 
     if (!fs.existsSync(uploadPath)) {
-      throw new NotFoundException(`File not found: ${fileId}`);
+      // Don't echo the fileId back — prevents information exposure (CodeQL: js/information-exposure)
+      throw new NotFoundException('Requested file not found');
     }
 
     try {
@@ -29,10 +43,6 @@ export class FileParserService {
       const lineCount = content.length === 0 ? 0 : content.split('\n').length;
 
       const extension = path.extname(fileId).toLowerCase();
-      // To get the original filename safely, we'd ideally load it from a database.
-      // But since we are asked to not use a database for uploads yet, we can try to extract the original part of the filename
-      // Our filename format is `fieldname-uniqueSuffix.ext`. We'll just return the `fileId` as the filename for now,
-      // or we can just use the fileId directly.
       const filename = fileId;
 
       return {
@@ -43,7 +53,11 @@ export class FileParserService {
         lineCount,
       };
     } catch (err) {
-      this.logger.error(`Error parsing file ${fileId}`, err);
+      // Sanitize fileId in logs to prevent log injection (CodeQL: js/log-injection)
+      this.logger.error(
+        `Error parsing file ${sanitizeForLog(fileId)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       throw err;
     }
   }

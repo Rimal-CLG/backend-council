@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DEBUG_AGENT_PROMPT } from './prompts';
 import { DebugResponseSchema, DebugResponse } from './schemas';
-import { AiResponseParser, invokeGroq } from '@Common';
+import { AiResponseParser, invokeGroq, sanitizeForLog } from '@Common';
 import { AgentContext, AgentResult, AiParseException } from '@Common';
 import { DEFAULT_MODEL } from '@Common';
 
@@ -32,7 +32,9 @@ export class DebugAgentService {
       ${filesContext}
       `;
 
-    this.logger.log(`model=${modelId} promptLength=${prompt.length}`);
+    this.logger.log(
+      `model=${sanitizeForLog(modelId)} promptLength=${prompt.length}`,
+    );
 
     try {
       const rawText = await invokeGroq(prompt, modelId);
@@ -57,7 +59,7 @@ export class DebugAgentService {
             ? error.message
             : String(error);
 
-      this.logger.error(`${agentName} failed: ${errorMessage}`);
+      this.logger.error(`${agentName} failed: ${sanitizeForLog(errorMessage)}`);
 
       return {
         data: null,

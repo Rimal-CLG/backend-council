@@ -3,6 +3,7 @@ import { VerificationResult } from './interfaces/verification-result.interface';
 import { BuildValidator } from './validators/build.validator';
 import { LintValidator } from './validators/lint.validator';
 import { TestValidator } from './validators/test.validator';
+import { sanitizeForLog } from '@Common';
 
 @Injectable()
 export class VerificationService {
@@ -15,8 +16,9 @@ export class VerificationService {
   ) {}
 
   async verifyRepository(repositoryId: string): Promise<VerificationResult> {
+    // Sanitize log output (CodeQL: js/log-injection)
     this.logger.log(
-      `Starting verification pipeline for repository ${repositoryId}`,
+      `Starting verification pipeline for repository ${sanitizeForLog(repositoryId)}`,
     );
     const globalStartTime = Date.now();
     const errors: string[] = [];
@@ -59,8 +61,9 @@ export class VerificationService {
     // If it fails, penalize the confidence score.
     const confidenceAdjustment = success ? 0.15 : errors.length * -0.05;
 
+    // Sanitize log output (CodeQL: js/log-injection)
     this.logger.log(
-      `Verification completed for repository ${repositoryId} in ${totalDurationMs}ms. Success: ${success}`,
+      `Verification completed for repository ${sanitizeForLog(repositoryId)} in ${totalDurationMs}ms. Success: ${String(success)}`,
     );
 
     return {
