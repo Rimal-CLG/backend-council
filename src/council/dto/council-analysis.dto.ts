@@ -1,21 +1,3 @@
-export class CouncilAnalysisDto {
-  framework?: string;
+import { OrchestratorRequestDto } from '../../orchestrator/dto/orchestrator-request.dto';
 
-  database?: string;
-
-  orm?: string;
-
-  error?: string;
-
-  logs?: string;
-
-  stackTrace?: string;
-
-  code?: string;
-
-  fileIds?: string[];
-
-  repositoryId?: string;
-
-  generatePatch?: boolean;
-}
+export class CouncilAnalysisDto extends OrchestratorRequestDto {}
