@@ -62,3 +62,12 @@ storage/
 temp/
 *.zip
 *.rar
+
+# CodeQL
+codeql/
+codeql-db/
+codeql.tar.gz
+codeql-db/
+*.sarif
+*.gz
+*.tar

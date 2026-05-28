@@ -2,9 +2,10 @@ import {
   Injectable,
   Logger,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { sanitizeForLog } from '@Common';
+import { sanitizeForLog, isValidUUID } from '@Common';
 import { DatabaseAgentService } from '../agents/database-agent/database-agent.service';
 import { SecurityAgentService } from '../agents/security-agent/security-agent.service';
 import { DebugAgentService } from '../agents/debug-agent/debug-agent.service';
@@ -15,6 +16,9 @@ import { VerificationService } from '../verification/verification.service';
 import { VerificationResult } from '../verification/interfaces/verification-result.interface';
 import { PatchService } from '../patch/patch.service';
 import { PatchResult } from '../patch/interfaces/patch-result.interface';
+import { SandboxService } from '../sandbox/sandbox.service';
+import { VerifiedPatchResult } from '../sandbox/interfaces/verified-patch-result.interface';
+import { JudgePatchEvalResponse } from '../agents/judge-agent/schemas';
 import { OrchestratorRequestDto } from './dto/orchestrator-request.dto';
 import { OrchestrationResult } from './interfaces/orchestration-result.interface';
 import { AgentExecution } from '../common/interfaces/agent-execution.interface';
@@ -45,11 +49,16 @@ export class OrchestratorService {
     private readonly agentContextBuilderService: AgentContextBuilderService,
     private readonly verificationService: VerificationService,
     private readonly patchService: PatchService,
+    private readonly sandboxService: SandboxService,
   ) {}
 
   async orchestrate(
     request: OrchestratorRequestDto,
   ): Promise<OrchestrationResult> {
+    if (request.repositoryId && !isValidUUID(request.repositoryId)) {
+      throw new BadRequestException('Invalid repositoryId');
+    }
+
     const executionId = randomUUID();
     const orchestrationStart = Date.now();
 
@@ -110,11 +119,33 @@ export class OrchestratorService {
     }
 
     let patch: PatchResult | null = null;
+    let verifiedPatch: VerifiedPatchResult | null = null;
+    let patchEvaluation: JudgePatchEvalResponse | null = null;
+
     if (request.generatePatch && request.repositoryId) {
       patch = await this.patchService.generatePatch(
         request.repositoryId,
         judgeResult.data,
       );
+
+      if (patch) {
+        verifiedPatch = await this.sandboxService.verifyPatch(
+          request.repositoryId,
+          patch,
+        );
+
+        if (verifiedPatch) {
+          const evalResult = await this.judgeAgent.evaluatePatch({
+            originalAnalysis: judgeResult.data,
+            patch,
+            verificationResult: verifiedPatch,
+          });
+          agentExecutions.push(evalResult.execution);
+          if (evalResult.data) {
+            patchEvaluation = evalResult.data;
+          }
+        }
+      }
     }
 
     const totalDurationMs = Date.now() - orchestrationStart;
@@ -129,6 +160,8 @@ export class OrchestratorService {
       debugAnalysis: debugResult.data,
       finalAnalysis: judgeResult.data,
       patch,
+      verifiedPatch,
+      patchEvaluation,
       metadata: {
         totalDurationMs,
         successfulAgents,
