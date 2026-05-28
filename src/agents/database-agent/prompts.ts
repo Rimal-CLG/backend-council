@@ -36,7 +36,13 @@ Output format:
   "rootCause": "",
   "issues": [],
   "recommendations": [],
-  "optimizedCode": "",
+  "fixes": [
+    {
+      "file": "path/to/file",
+      "description": "",
+      "code": ""
+    }
+  ],
   "confidence": 0.0
 }
 `;

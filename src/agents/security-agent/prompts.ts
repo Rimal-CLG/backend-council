@@ -35,7 +35,13 @@ Output format:
   "securityIssues": [],
   "severity": "LOW | MEDIUM | HIGH | CRITICAL",
   "recommendations": [],
-  "secureCode": "",
+  "fixes": [
+    {
+      "file": "path/to/file",
+      "description": "",
+      "code": ""
+    }
+  ],
   "confidence": 0.0
 }
 `;
