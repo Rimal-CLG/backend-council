@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DEBUG_AGENT_PROMPT } from './prompts';
 import { DebugResponseSchema, DebugResponse } from './schemas';
-import { AiResponseParser, invokeGroq } from '@Common';
+import { AiResponseParser, invokeGroq, sanitizeForLog } from '@Common';
 import { AgentContext, AgentResult, AiParseException } from '@Common';
 import { DEFAULT_MODEL } from '@Common';
 
@@ -14,15 +14,27 @@ export class DebugAgentService {
     const agentName = 'DebugAgent';
     const modelId = process.env.DEBUG_AGENT_MODEL || DEFAULT_MODEL;
 
+    let filesContext = '';
+    if (context.files && context.files.length > 0) {
+      filesContext =
+        `\n\nAttached Files:\n` +
+        context.files
+          .map((f) => `--- ${f.filename} ---\n${f.content}`)
+          .join('\n\n');
+    }
+
     const prompt = `
-        ${DEBUG_AGENT_PROMPT}
+      ${DEBUG_AGENT_PROMPT}
 
-        Analyze:
+      Analyze the following context:
 
-        ${JSON.stringify(context, null, 2)}
-        `;
+      ${JSON.stringify(context, null, 2)}
+      ${filesContext}
+      `;
 
-    this.logger.log(`model=${modelId} promptLength=${prompt.length}`);
+    this.logger.log(
+      `model=${sanitizeForLog(modelId)} promptLength=${prompt.length}`,
+    );
 
     try {
       const rawText = await invokeGroq(prompt, modelId);
@@ -47,7 +59,7 @@ export class DebugAgentService {
             ? error.message
             : String(error);
 
-      this.logger.error(`${agentName} failed: ${errorMessage}`);
+      this.logger.error(`${agentName} failed: ${sanitizeForLog(errorMessage)}`);
 
       return {
         data: null,

@@ -1,7 +1,3 @@
-import { BuildContextDto } from '../../context/dto/build-context.dto';
+import { OrchestratorRequestDto } from '../../orchestrator/dto/orchestrator-request.dto';
 
-/**
- * CouncilAnalysisDto re-uses all fields from BuildContextDto.
- * All validation decorators (IsOptional, IsString) are inherited.
- */
-export class CouncilAnalysisDto extends BuildContextDto {}
+export class CouncilAnalysisDto extends OrchestratorRequestDto {}

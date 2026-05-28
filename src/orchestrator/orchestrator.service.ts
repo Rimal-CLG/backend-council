@@ -4,11 +4,17 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { sanitizeForLog } from '@Common';
 import { DatabaseAgentService } from '../agents/database-agent/database-agent.service';
 import { SecurityAgentService } from '../agents/security-agent/security-agent.service';
 import { DebugAgentService } from '../agents/debug-agent/debug-agent.service';
 import { JudgeAgentService } from '../agents/judge-agent/judge-agent.service';
 import { ContextService } from '../context/context.service';
+import { AgentContextBuilderService } from '../context/builders/agent-context-builder.service';
+import { VerificationService } from '../verification/verification.service';
+import { VerificationResult } from '../verification/interfaces/verification-result.interface';
+import { PatchService } from '../patch/patch.service';
+import { PatchResult } from '../patch/interfaces/patch-result.interface';
 import { OrchestratorRequestDto } from './dto/orchestrator-request.dto';
 import { OrchestrationResult } from './interfaces/orchestration-result.interface';
 import { AgentExecution } from '../common/interfaces/agent-execution.interface';
@@ -36,6 +42,9 @@ export class OrchestratorService {
     private readonly debugAgent: DebugAgentService,
     private readonly judgeAgent: JudgeAgentService,
     private readonly contextService: ContextService,
+    private readonly agentContextBuilderService: AgentContextBuilderService,
+    private readonly verificationService: VerificationService,
+    private readonly patchService: PatchService,
   ) {}
 
   async orchestrate(
@@ -44,18 +53,26 @@ export class OrchestratorService {
     const executionId = randomUUID();
     const orchestrationStart = Date.now();
 
-    this.logger.log(`[${executionId}] Orchestration started`);
+    this.logger.log(`[${sanitizeForLog(executionId)}] Orchestration started`);
 
     // Build clean AgentContext — no JSON stringification at this layer
-    const context = this.contextService.buildContext(request);
+    const baseContext = await this.contextService.buildContext(request);
 
-    // Run all 3 specialist agents in parallel.
+    // Build specialized contexts per agent to reduce token usage and improve precision
+    const { databaseAgentContext, securityAgentContext, debugAgentContext } =
+      this.agentContextBuilderService.buildContexts(baseContext);
+
+    // Run all 3 specialist agents and verification in parallel.
     // Each agent handles its own errors and returns AgentResult<T> — never throws.
-    const [dbResult, secResult, debugResult] = await Promise.all([
-      this.databaseAgent.analyze(context),
-      this.securityAgent.analyze(context),
-      this.debugAgent.analyze(context),
-    ]);
+    const [dbResult, secResult, debugResult, verificationResult] =
+      await Promise.all([
+        this.databaseAgent.analyze(databaseAgentContext),
+        this.securityAgent.analyze(securityAgentContext),
+        this.debugAgent.analyze(debugAgentContext),
+        request.repositoryId
+          ? this.verificationService.verifyRepository(request.repositoryId)
+          : Promise.resolve(null),
+      ]);
 
     const agentExecutions: AgentExecution[] = [
       dbResult.execution,
@@ -67,7 +84,7 @@ export class OrchestratorService {
     const failedAgents = agentExecutions.filter((e) => !e.success).length;
 
     this.logger.log(
-      `[${executionId}] Specialist agents complete — success=${successfulAgents} failed=${failedAgents}`,
+      `[${sanitizeForLog(executionId)}] Specialist agents complete — success=${successfulAgents} failed=${failedAgents}`,
     );
 
     if (successfulAgents === 0) {
@@ -81,6 +98,7 @@ export class OrchestratorService {
       databaseAnalysis: dbResult.data,
       securityAnalysis: secResult.data,
       debugAnalysis: debugResult.data,
+      verificationResult: verificationResult as VerificationResult | undefined,
     });
 
     agentExecutions.push(judgeResult.execution);
@@ -91,9 +109,17 @@ export class OrchestratorService {
       );
     }
 
+    let patch: PatchResult | null = null;
+    if (request.generatePatch && request.repositoryId) {
+      patch = await this.patchService.generatePatch(
+        request.repositoryId,
+        judgeResult.data,
+      );
+    }
+
     const totalDurationMs = Date.now() - orchestrationStart;
     this.logger.log(
-      `[${executionId}] Orchestration complete in ${totalDurationMs}ms`,
+      `[${sanitizeForLog(executionId)}] Orchestration complete in ${totalDurationMs}ms`,
     );
 
     return {
@@ -102,6 +128,7 @@ export class OrchestratorService {
       securityAnalysis: secResult.data,
       debugAnalysis: debugResult.data,
       finalAnalysis: judgeResult.data,
+      patch,
       metadata: {
         totalDurationMs,
         successfulAgents,
